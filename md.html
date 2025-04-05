@@ -68,9 +68,15 @@
             padding-left: 10px;
             margin-left: 0;
         }
+        button {
+            padding: 8px 15px;
+            margin: 10px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
+    <button id="downloadButton">下载 Markdown 文件</button>
     <div class="container">
         <textarea id="markdownInput" placeholder="在此输入 Markdown"></textarea>
         <div id="preview"></div>
@@ -80,9 +86,10 @@
     <script>
         const markdownInput = document.getElementById('markdownInput');
         const preview = document.getElementById('preview');
+        const downloadButton = document.getElementById('downloadButton');
         const history = [];
         let historyIndex = -1;
-        const maxHistorySize = 50; // 设置最大撤销/重做步数
+        const maxHistorySize = 50;
 
         function insertTextAtCursor(text) {
             const start = markdownInput.selectionStart;
@@ -101,11 +108,11 @@
             if (history[historyIndex] !== markdownInput.value) {
                 historyIndex++;
                 if (historyIndex < history.length) {
-                    history.length = historyIndex; // 移除之前的“未来”历史
+                    history.length = historyIndex;
                 }
                 history.push(markdownInput.value);
                 if (history.length > maxHistorySize) {
-                    history.shift(); // 移除最旧的记录
+                    history.shift();
                     historyIndex--;
                 }
             }
@@ -114,11 +121,19 @@
 
         markdownInput.addEventListener('keydown', function(event) {
             const isUndo = (event.ctrlKey || event.metaKey) && event.key === 'z';
+            const isRedo = (event.ctrlKey && event.key === 'y') || (event.metaKey && event.shiftKey && event.key === 'Z');
 
             if (isUndo) {
-                event.preventDefault(); // 阻止浏览器默认的撤销行为
+                event.preventDefault();
                 if (historyIndex > 0) {
                     historyIndex--;
+                    markdownInput.value = history[historyIndex];
+                    updatePreview();
+                }
+            } else if (isRedo) {
+                event.preventDefault();
+                if (historyIndex < history.length - 1) {
+                    historyIndex++;
                     markdownInput.value = history[historyIndex];
                     updatePreview();
                 }
@@ -146,7 +161,9 @@
                     if (item.type === 'text/uri-list' || item.type === 'text/plain') {
                         item.getAsString(text => {
                             if (text.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
-                                const markdownImage = `![图片描述](${text})`;
+                                const selectedText = markdownInput.value.substring(markdownInput.selectionStart, markdownInput.selectionEnd);
+                                const altText = selectedText || 'http://www.tsunako.fun';
+                                const markdownImage = `![${altText}](${text})`;
                                 insertTextAtCursor(markdownImage);
                             } else if (text.startsWith('http://') || text.startsWith('https://')) {
                                 const markdownLink = `[链接文本](${text})`;
@@ -190,6 +207,21 @@
                     markdownInput.dispatchEvent(new Event('input'));
                 }
             }
+        });
+
+        downloadButton.addEventListener('click', function() {
+            const markdownContent = markdownInput.value;
+            const filename = 'MyMarkdown.md'; // 预先重命名的文件名
+            const blob = new Blob([markdownContent], { type: 'text/markdown' });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         });
 
         // 初始化历史记录
