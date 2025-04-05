@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简易 Markdown 编辑器</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            display: flex;
+            flex-grow: 1;
+        }
+        textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-right: none;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            height: 100%;
+            outline: none;
+        }
+        #preview {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            background-color: #f9f9f9;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
+            font-weight: bold;
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+        #preview h1 { font-size: 2em; }
+        #preview h2 { font-size: 1.5em; }
+        #preview h3 { font-size: 1.17em; }
+        #preview p {
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+        }
+        #preview code {
+            font-family: monospace;
+            background-color: #eee;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+        }
+        #preview pre {
+            background-color: #eee;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+            font-family: monospace;
+        }
+        #preview blockquote {
+            border-left: 5px solid #ccc;
+            padding-left: 10px;
+            margin-left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <textarea id="markdownInput" placeholder="在此输入 Markdown"></textarea>
+        <div id="preview"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        const markdownInput = document.getElementById('markdownInput');
+        const preview = document.getElementById('preview');
+        const history = [];
+        let historyIndex = -1;
+        const maxHistorySize = 50; // 设置最大撤销/重做步数
+
+        function insertTextAtCursor(text) {
+            const start = markdownInput.selectionStart;
+            const end = markdownInput.selectionEnd;
+            markdownInput.value = markdownInput.value.substring(0, start) + text + markdownInput.value.substring(end);
+            markdownInput.selectionStart = markdownInput.selectionEnd = start + text.length;
+        }
+
+        function updatePreview() {
+            const markdownText = markdownInput.value;
+            const html = marked.parse(markdownText);
+            preview.innerHTML = html;
+        }
+
+        markdownInput.addEventListener('input', function() {
+            if (history[historyIndex] !== markdownInput.value) {
+                historyIndex++;
+                if (historyIndex < history.length) {
+                    history.length = historyIndex; // 移除之前的“未来”历史
+                }
+                history.push(markdownInput.value);
+                if (history.length > maxHistorySize) {
+                    history.shift(); // 移除最旧的记录
+                    historyIndex--;
+                }
+            }
+            updatePreview();
+        });
+
+        markdownInput.addEventListener('keydown', function(event) {
+            const isUndo = (event.ctrlKey || event.metaKey) && event.key === 'z';
+
+            if (isUndo) {
+                event.preventDefault(); // 阻止浏览器默认的撤销行为
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    markdownInput.value = history[historyIndex];
+                    updatePreview();
+                }
+            }
+        });
+
+        markdownInput.addEventListener('dragover', function(event) {
+            event.preventDefault();
+        });
+
+        markdownInput.addEventListener('drop', function(event) {
+            event.preventDefault();
+
+            const files = event.dataTransfer.files;
+            const items = event.dataTransfer.items;
+
+            if (files.length > 0) {
+                alert('无法直接处理本地文件，请拖拽图片网址。');
+                return;
+            }
+
+            if (items.length > 0) {
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    if (item.type === 'text/uri-list' || item.type === 'text/plain') {
+                        item.getAsString(text => {
+                            if (text.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
+                                const markdownImage = `![图片描述](${text})`;
+                                insertTextAtCursor(markdownImage);
+                            } else if (text.startsWith('http://') || text.startsWith('https://')) {
+                                const markdownLink = `[链接文本](${text})`;
+                                insertTextAtCursor(markdownLink);
+                            } else {
+                                insertTextAtCursor(text);
+                            }
+                            markdownInput.dispatchEvent(new Event('input'));
+                        });
+                        return;
+                    }
+                }
+            }
+        });
+
+        markdownInput.addEventListener('paste', function(event) {
+            const items = (event.clipboardData || window.clipboardData).items;
+            let file = null;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    file = items[i].getAsFile();
+                    break;
+                }
+            }
+
+            if (file) {
+                event.preventDefault();
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64Image = e.target.result;
+                    const markdownImage = `![粘贴的图片](${base64Image})`;
+                    insertTextAtCursor(markdownImage);
+                    markdownInput.dispatchEvent(new Event('input'));
+                };
+                reader.readAsDataURL(file);
+            } else {
+                const text = (event.clipboardData || window.clipboardData).getData('text');
+                if (text) {
+                    insertTextAtCursor(text);
+                    markdownInput.dispatchEvent(new Event('input'));
+                }
+            }
+        });
+
+        // 初始化历史记录
+        history.push(markdownInput.value);
+        historyIndex = 0;
+        updatePreview();
+    </script>
+</body>
+</html>
