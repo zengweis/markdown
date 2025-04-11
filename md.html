@@ -27,6 +27,8 @@
             line-height: 1.5;
             height: 100%;
             outline: none;
+            /* Ensure textarea takes full height available */
+            resize: none; /* Optional: disable manual resizing */
         }
         #preview {
             flex: 1;
@@ -37,6 +39,7 @@
             overflow-y: auto;
             font-size: 14px;
             line-height: 1.6;
+            height: 100%; /* Ensure preview takes full height */
         }
         #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
             font-weight: bold;
@@ -73,6 +76,10 @@
             margin: 10px;
             cursor: pointer;
         }
+        /* Ensure container and its children fill the height */
+        .container {
+             height: calc(100% - 50px); /* Adjust 50px based on button height/margins */
+        }
     </style>
 </head>
 <body>
@@ -83,6 +90,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
     <script>
         const markdownInput = document.getElementById('markdownInput');
         const preview = document.getElementById('preview');
@@ -91,37 +99,48 @@
         let historyIndex = -1;
         const maxHistorySize = 50;
 
+        // Helper function to insert text at the current cursor position
         function insertTextAtCursor(text) {
             const start = markdownInput.selectionStart;
             const end = markdownInput.selectionEnd;
-            markdownInput.value = markdownInput.value.substring(0, start) + text + markdownInput.value.substring(end);
+            const currentText = markdownInput.value;
+            markdownInput.value = currentText.substring(0, start) + text + currentText.substring(end);
+            // Place cursor after the inserted text
             markdownInput.selectionStart = markdownInput.selectionEnd = start + text.length;
+            // Focus the textarea after insertion
+            markdownInput.focus();
         }
 
+        // Function to update the preview pane
         function updatePreview() {
             const markdownText = markdownInput.value;
-            const html = marked.parse(markdownText);
+            // Use marked library to parse Markdown to HTML
+            // Added options for better compatibility (e.g., line breaks)
+            const html = marked.parse(markdownText, { breaks: true, gfm: true });
             preview.innerHTML = html;
         }
 
+        // Event listener for input changes (typing, pasting handled manually)
         markdownInput.addEventListener('input', function() {
+            // Simple history management (could be improved)
             if (history[historyIndex] !== markdownInput.value) {
                 historyIndex++;
                 if (historyIndex < history.length) {
-                    history.length = historyIndex;
+                    history.length = historyIndex; // Clear redo history
                 }
                 history.push(markdownInput.value);
                 if (history.length > maxHistorySize) {
-                    history.shift();
+                    history.shift(); // Remove oldest entry
                     historyIndex--;
                 }
             }
             updatePreview();
         });
 
+        // Event listener for keyboard shortcuts (Undo/Redo)
         markdownInput.addEventListener('keydown', function(event) {
             const isUndo = (event.ctrlKey || event.metaKey) && event.key === 'z';
-            const isRedo = (event.ctrlKey && event.key === 'y') || (event.metaKey && event.shiftKey && event.key === 'Z');
+            const isRedo = (event.ctrlKey && event.key === 'y') || (event.metaKey && event.shiftKey && event.key === 'Z'); // Cmd+Shift+Z for Redo on Mac
 
             if (isUndo) {
                 event.preventDefault();
@@ -140,94 +159,149 @@
             }
         });
 
+        // Event listeners for drag and drop (images/links)
         markdownInput.addEventListener('dragover', function(event) {
-            event.preventDefault();
+            event.preventDefault(); // Necessary to allow drop
         });
 
         markdownInput.addEventListener('drop', function(event) {
-            event.preventDefault();
+            event.preventDefault(); // Prevent default file opening behavior
 
             const files = event.dataTransfer.files;
             const items = event.dataTransfer.items;
 
+            // Basic check: prevent dropping local files directly for now
             if (files.length > 0) {
-                alert('无法直接处理本地文件，请拖拽图片网址。');
+                alert('无法直接处理本地文件拖拽，请拖拽图片网址或文本。');
                 return;
             }
 
+            // Handle dropped items (links, potentially text)
             if (items.length > 0) {
                 for (let i = 0; i < items.length; i++) {
                     const item = items[i];
-                    if (item.type === 'text/uri-list' || item.type === 'text/plain') {
+                    // Check if it's a URI or plain text
+                    if (item.kind === 'string' && (item.type === 'text/uri-list' || item.type === 'text/plain')) {
                         item.getAsString(text => {
-                            if (text.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
+                            // Heuristic to check if it looks like an image URL
+                            if (text.match(/\.(jpg|jpeg|png|gif|bmp|webp)(\?.*)?$/i)) {
                                 const selectedText = markdownInput.value.substring(markdownInput.selectionStart, markdownInput.selectionEnd);
-                                const altText = selectedText || 'http://www.tsunako.fun';
+                                const altText = selectedText || '拖拽的图片'; // Use selected text or default
                                 const markdownImage = `![${altText}](${text})`;
                                 insertTextAtCursor(markdownImage);
                             } else if (text.startsWith('http://') || text.startsWith('https://')) {
+                                // Assume it's a link if it starts with http/https but isn't an image
                                 const markdownLink = `[链接文本](${text})`;
                                 insertTextAtCursor(markdownLink);
                             } else {
+                                // Otherwise, insert as plain text
                                 insertTextAtCursor(text);
                             }
+                            // Manually trigger input event to update history and preview
                             markdownInput.dispatchEvent(new Event('input'));
                         });
-                        return;
+                        return; // Handle only the first valid string item
                     }
                 }
             }
         });
 
+        // *** MODIFIED PASTE EVENT LISTENER ***
         markdownInput.addEventListener('paste', function(event) {
-            const items = (event.clipboardData || window.clipboardData).items;
-            let file = null;
+            const clipboardData = event.clipboardData || window.clipboardData;
+            if (!clipboardData) return; // Exit if no clipboard data
 
+            const items = clipboardData.items;
+            let handled = false; // Flag to track if the paste was handled
+
+            // Check clipboard items
             for (let i = 0; i < items.length; i++) {
+                // --- IMAGE HANDLING ---
                 if (items[i].type.indexOf('image') !== -1) {
-                    file = items[i].getAsFile();
-                    break;
+                    event.preventDefault(); // Prevent the default paste action
+                    handled = true;
+
+                    // Prompt the user for the image URL
+                    const imageUrl = prompt("检测到粘贴的图片，请输入该图片的网址 (URL):", "http://");
+
+                    // Check if the user entered a URL (didn't cancel and didn't leave it empty/default)
+                    if (imageUrl && imageUrl.trim() !== "" && imageUrl.trim().toLowerCase() !== "http://") {
+                        const altText = "粘贴的图片"; // You could prompt for Alt text too if needed
+                        const markdownImage = `![${altText}](${imageUrl.trim()})`;
+                        insertTextAtCursor(markdownImage);
+                        // Manually trigger input event to update history and preview
+                        markdownInput.dispatchEvent(new Event('input'));
+                    } else {
+                        // Optional: Provide feedback if the user cancelled or entered nothing useful
+                        console.log("图片粘贴操作已取消或未提供有效网址。");
+                         // Maybe insert a placeholder or do nothing
+                    }
+                    break; // Handle only the first image found
                 }
             }
 
-            if (file) {
-                event.preventDefault();
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const base64Image = e.target.result;
-                    const markdownImage = `![粘贴的图片](${base64Image})`;
-                    insertTextAtCursor(markdownImage);
-                    markdownInput.dispatchEvent(new Event('input'));
-                };
-                reader.readAsDataURL(file);
-            } else {
-                const text = (event.clipboardData || window.clipboardData).getData('text');
+            // --- TEXT HANDLING ---
+            // If not handled as an image, try handling as text
+            if (!handled) {
+                // Check specifically for 'text/plain'
+                const text = clipboardData.getData('text/plain');
                 if (text) {
+                    event.preventDefault(); // Prevent the default text paste action
+                    handled = true; // Mark as handled
                     insertTextAtCursor(text);
+                    // Manually trigger input event to update history and preview
                     markdownInput.dispatchEvent(new Event('input'));
                 }
             }
+
+            // If handled is still false here, the browser might perform its default action
+            // for any unhandled paste types.
         });
 
+        // Event listener for the download button
         downloadButton.addEventListener('click', function() {
             const markdownContent = markdownInput.value;
-            const filename = 'MyMarkdown.md'; // 预先重命名的文件名
-            const blob = new Blob([markdownContent], { type: 'text/markdown' });
+            const filename = 'MyMarkdown.md'; // Default filename
+            const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' }); // Specify charset
 
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            // Use File System Access API if available (more modern)
+            if (window.showSaveFilePicker) {
+                const options = {
+                    suggestedName: filename,
+                    types: [{
+                        description: 'Markdown 文件',
+                        accept: { 'text/markdown': ['.md'] },
+                    }],
+                };
+                window.showSaveFilePicker(options).then(async (fileHandle) => {
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                }).catch(err => {
+                    // Handle errors, e.g., user cancellation
+                    if (err.name !== 'AbortError') {
+                        console.error('无法保存文件:', err);
+                        alert('保存文件失败。');
+                    }
+                });
+            } else {
+                // Fallback for older browsers using download link
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a); // Append link to body
+                a.click(); // Programmatically click the link
+                document.body.removeChild(a); // Remove link from body
+                URL.revokeObjectURL(url); // Release the object URL
+            }
         });
 
-        // 初始化历史记录
+        // Initial setup: push initial state to history and render preview
         history.push(markdownInput.value);
         historyIndex = 0;
         updatePreview();
+
     </script>
 </body>
 </html>
