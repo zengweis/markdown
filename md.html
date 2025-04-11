@@ -3,303 +3,446 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>简易 Markdown 编辑器</title>
+    <title>Markdown 编辑器</title>
     <style>
+        /* 基本样式 */
         body {
-            font-family: sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: 100vh; /* 占满整个视窗高度 */
             margin: 0;
-        }
-        .container {
-            display: flex;
-            flex-grow: 1;
-        }
-        textarea {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-right: none;
-            box-sizing: border-box;
-            font-family: monospace;
-            font-size: 14px;
-            line-height: 1.5;
-            height: 100%;
-            outline: none;
-            /* Ensure textarea takes full height available */
-            resize: none; /* Optional: disable manual resizing */
-        }
-        #preview {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            box-sizing: border-box;
-            background-color: #f9f9f9;
-            overflow-y: auto;
             font-size: 14px;
             line-height: 1.6;
-            height: 100%; /* Ensure preview takes full height */
         }
+        /* 顶部按钮区域 */
+        .controls {
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            flex-shrink: 0; /* 防止按钮区域被压缩 */
+        }
+        /* 编辑器和预览容器 */
+        .container {
+            display: flex;
+            flex-grow: 1; /* 占满剩余空间 */
+            height: calc(100% - 45px); /* 减去按钮区域大致高度 */
+            overflow: hidden; /* 防止内部元素溢出导致滚动条 */
+        }
+        /* 编辑区域 */
+        textarea {
+            flex: 1; /* 占据一半空间 */
+            padding: 15px;
+            border: none; /* 移除边框 */
+            border-right: 1px solid #ccc; /* 右侧加分割线 */
+            box-sizing: border-box;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            height: 100%; /* 占满容器高度 */
+            outline: none; /* 移除聚焦时的外框 */
+            resize: none; /* 禁止用户调整大小 */
+            overflow-y: auto; /* 需要时显示垂直滚动条 */
+        }
+        /* 预览区域 */
+        #preview {
+            flex: 1; /* 占据另一半空间 */
+            padding: 15px;
+            border: none; /* 移除边框 */
+            box-sizing: border-box;
+            background-color: #ffffff; /* 背景色 */
+            overflow-y: auto; /* 需要时显示垂直滚动条 */
+            height: 100%; /* 占满容器高度 */
+            word-wrap: break-word; /* 长单词自动换行 */
+        }
+        /* 预览区域内的样式 */
         #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
-            font-weight: bold;
-            margin-top: 1em;
-            margin-bottom: 0.5em;
+            font-weight: 600;
+            margin-top: 1.2em;
+            margin-bottom: 0.6em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.3em;
         }
         #preview h1 { font-size: 2em; }
         #preview h2 { font-size: 1.5em; }
-        #preview h3 { font-size: 1.17em; }
-        #preview p {
-            margin-top: 0.5em;
-            margin-bottom: 0.5em;
-        }
+        #preview h3 { font-size: 1.25em; }
+        #preview p { margin-top: 0; margin-bottom: 1em; }
         #preview code {
-            font-family: monospace;
-            background-color: #eee;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            background-color: #f6f8fa;
             padding: 0.2em 0.4em;
             border-radius: 3px;
+            font-size: 85%;
         }
         #preview pre {
-            background-color: #eee;
-            padding: 10px;
+            background-color: #f6f8fa;
+            padding: 16px;
             border-radius: 3px;
-            overflow-x: auto;
-            font-family: monospace;
+            overflow: auto; /* 代码块内部滚动 */
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            line-height: 1.45;
+            font-size: 85%;
+        }
+        #preview pre code {
+           padding: 0; /* 代码块内的 code 标签不需要额外 padding */
+           background-color: transparent; /* 背景透明 */
+           border-radius: 0;
         }
         #preview blockquote {
-            border-left: 5px solid #ccc;
-            padding-left: 10px;
+            border-left: 4px solid #dfe2e5;
+            padding: 0 1em;
             margin-left: 0;
+            color: #6a737d;
         }
+        #preview ul, #preview ol {
+             padding-left: 2em;
+             margin-bottom: 1em;
+        }
+        #preview img {
+            max-width: 100%; /* 图片自适应宽度 */
+            height: auto;
+        }
+        /* 按钮样式 */
         button {
-            padding: 8px 15px;
-            margin: 10px;
+            padding: 6px 12px;
+            margin: 0 5px;
             cursor: pointer;
+            background-color: #0366d6;
+            color: white;
+            border: 1px solid #0366d6;
+            border-radius: 6px;
+            font-size: 13px;
         }
-        /* Ensure container and its children fill the height */
-        .container {
-             height: calc(100% - 50px); /* Adjust 50px based on button height/margins */
+        button:hover {
+            background-color: #005cc5;
+            border-color: #005cc5;
         }
     </style>
 </head>
 <body>
-    <button id="downloadButton">下载 Markdown 文件</button>
+    <div class="controls">
+        <button id="downloadButton">下载 Markdown 文件</button>
+    </div>
     <div class="container">
-        <textarea id="markdownInput" placeholder="在此输入 Markdown"></textarea>
+        <textarea id="markdownInput" placeholder="在此输入 Markdown..."></textarea>
         <div id="preview"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <script>
+        // 获取 DOM 元素
         const markdownInput = document.getElementById('markdownInput');
         const preview = document.getElementById('preview');
         const downloadButton = document.getElementById('downloadButton');
+
+        // 定义用于 localStorage 的键名 (可以加上版本号以便后续升级)
+        const storageKey = 'markdownEditorContent_v2';
+
+        // 历史记录相关变量
         const history = [];
         let historyIndex = -1;
-        const maxHistorySize = 50;
+        const maxHistorySize = 50; // 最多保存 50 步历史
 
-        // Helper function to insert text at the current cursor position
+        // --- 1. 页面加载时：尝试从 localStorage 加载内容 ---
+        try {
+            const savedContent = localStorage.getItem(storageKey);
+            if (savedContent !== null) {
+                markdownInput.value = savedContent;
+                console.log("已从 localStorage 加载上次编辑的内容。");
+            }
+        } catch (e) {
+            console.error("无法从 localStorage 加载内容:", e);
+            // 这里可以考虑给用户一个提示
+        }
+
+        // --- Helper 函数 ---
+
+        // 在光标处插入文本
         function insertTextAtCursor(text) {
             const start = markdownInput.selectionStart;
             const end = markdownInput.selectionEnd;
             const currentText = markdownInput.value;
             markdownInput.value = currentText.substring(0, start) + text + currentText.substring(end);
-            // Place cursor after the inserted text
+            // 移动光标到插入文本之后
             markdownInput.selectionStart = markdownInput.selectionEnd = start + text.length;
-            // Focus the textarea after insertion
+            // 重新聚焦输入框
             markdownInput.focus();
         }
 
-        // Function to update the preview pane
+        // 更新预览区域
         function updatePreview() {
             const markdownText = markdownInput.value;
-            // Use marked library to parse Markdown to HTML
-            // Added options for better compatibility (e.g., line breaks)
-            const html = marked.parse(markdownText, { breaks: true, gfm: true });
+            // 使用 marked 将 Markdown 转换为 HTML
+            // 启用 GFM (GitHub Flavored Markdown) 和 breaks (回车转为 <br>)
+            const html = marked.parse(markdownText, { gfm: true, breaks: true });
             preview.innerHTML = html;
         }
 
-        // Event listener for input changes (typing, pasting handled manually)
+        // Debounce (防抖) 函数: 延迟执行，防止过于频繁的操作
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // --- 2. 自动保存功能 (使用 Debounce) ---
+        const saveContentDebounced = debounce(() => {
+            try {
+                localStorage.setItem(storageKey, markdownInput.value);
+                // console.log("内容已自动保存。"); // 可以取消注释以在控制台显示保存提示
+            } catch (e) {
+                console.error("无法保存内容到 localStorage:", e);
+                // 考虑给用户一个提示，比如存储空间已满
+                // alert("自动保存失败，可能是浏览器存储空间已满。");
+            }
+        }, 500); // 用户停止输入 500 毫秒后执行保存
+
+        // --- 事件监听器 ---
+
+        // 输入事件 (包括打字、删除、以及手动触发的 input 事件)
         markdownInput.addEventListener('input', function() {
-            // Simple history management (could be improved)
-            if (history[historyIndex] !== markdownInput.value) {
+            // 管理历史记录
+            const currentValue = markdownInput.value;
+            if (history[historyIndex] !== currentValue) { // 只有内容变化时才记录
                 historyIndex++;
+                // 如果当前不是在历史记录末尾（执行了撤销），则清除后续的“重做”历史
                 if (historyIndex < history.length) {
-                    history.length = historyIndex; // Clear redo history
+                    history.length = historyIndex;
                 }
-                history.push(markdownInput.value);
+                history.push(currentValue);
+                // 限制历史记录大小
                 if (history.length > maxHistorySize) {
-                    history.shift(); // Remove oldest entry
-                    historyIndex--;
+                    history.shift(); // 移除最旧的记录
+                    historyIndex--; // 索引也相应调整
                 }
             }
+            // 更新预览
             updatePreview();
+            // 触发自动保存 (防抖)
+            saveContentDebounced();
         });
 
-        // Event listener for keyboard shortcuts (Undo/Redo)
+        // 键盘事件 (处理撤销/重做)
         markdownInput.addEventListener('keydown', function(event) {
-            const isUndo = (event.ctrlKey || event.metaKey) && event.key === 'z';
-            const isRedo = (event.ctrlKey && event.key === 'y') || (event.metaKey && event.shiftKey && event.key === 'Z'); // Cmd+Shift+Z for Redo on Mac
+            // 检查是否是撤销操作 (Cmd/Ctrl + Z)
+            const isUndo = (event.metaKey || event.ctrlKey) && event.key === 'z';
+            // 检查是否是重做操作 (Cmd/Ctrl + Y 或 Cmd+Shift+Z)
+            const isRedo = (event.ctrlKey && event.key === 'y') || (event.metaKey && event.shiftKey && event.key.toLowerCase() === 'z');
 
             if (isUndo) {
-                event.preventDefault();
-                if (historyIndex > 0) {
+                event.preventDefault(); // 阻止浏览器默认的撤销行为
+                if (historyIndex > 0) { // 确保有可撤销的状态
                     historyIndex--;
                     markdownInput.value = history[historyIndex];
                     updatePreview();
+                    saveContentDebounced(); // 撤销后也保存状态
                 }
             } else if (isRedo) {
-                event.preventDefault();
-                if (historyIndex < history.length - 1) {
+                event.preventDefault(); // 阻止浏览器默认的重做行为
+                if (historyIndex < history.length - 1) { // 确保有可重做的状态
                     historyIndex++;
                     markdownInput.value = history[historyIndex];
                     updatePreview();
+                    saveContentDebounced(); // 重做后也保存状态
                 }
             }
         });
 
-        // Event listeners for drag and drop (images/links)
+        // 拖拽事件 (允许放置)
         markdownInput.addEventListener('dragover', function(event) {
-            event.preventDefault(); // Necessary to allow drop
+            event.preventDefault(); // 必须阻止默认行为才能触发 drop 事件
         });
 
+        // 放置事件 (处理拖拽进来的链接或文本)
         markdownInput.addEventListener('drop', function(event) {
-            event.preventDefault(); // Prevent default file opening behavior
+            event.preventDefault(); // 阻止浏览器默认的文件打开或导航行为
 
             const files = event.dataTransfer.files;
             const items = event.dataTransfer.items;
 
-            // Basic check: prevent dropping local files directly for now
+            // 暂时不支持直接拖拽本地文件
             if (files.length > 0) {
-                alert('无法直接处理本地文件拖拽，请拖拽图片网址或文本。');
+                alert('目前不支持直接拖拽本地文件，请拖拽图片网址或链接。');
                 return;
             }
 
-            // Handle dropped items (links, potentially text)
-            if (items.length > 0) {
+            // 处理拖拽进来的项目 (通常是链接或文本)
+            if (items && items.length > 0) {
                 for (let i = 0; i < items.length; i++) {
                     const item = items[i];
-                    // Check if it's a URI or plain text
+                    // 检查是否是字符串类型，且内容是 URI 或纯文本
                     if (item.kind === 'string' && (item.type === 'text/uri-list' || item.type === 'text/plain')) {
                         item.getAsString(text => {
-                            // Heuristic to check if it looks like an image URL
-                            if (text.match(/\.(jpg|jpeg|png|gif|bmp|webp)(\?.*)?$/i)) {
-                                const selectedText = markdownInput.value.substring(markdownInput.selectionStart, markdownInput.selectionEnd);
-                                const altText = selectedText || '拖拽的图片'; // Use selected text or default
-                                const markdownImage = `![${altText}](${text})`;
-                                insertTextAtCursor(markdownImage);
-                            } else if (text.startsWith('http://') || text.startsWith('https://')) {
-                                // Assume it's a link if it starts with http/https but isn't an image
-                                const markdownLink = `[链接文本](${text})`;
-                                insertTextAtCursor(markdownLink);
-                            } else {
-                                // Otherwise, insert as plain text
-                                insertTextAtCursor(text);
+                            if (text) {
+                                // 简单判断是否像图片 URL
+                                if (text.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)(\?.*)?$/i)) {
+                                    const selectedText = markdownInput.value.substring(markdownInput.selectionStart, markdownInput.selectionEnd);
+                                    const altText = selectedText || '拖拽的图片';
+                                    const markdownImage = `![${altText}](${text})`;
+                                    insertTextAtCursor(markdownImage);
+                                } else if (text.startsWith('http://') || text.startsWith('https://')) {
+                                    // 认为是普通链接
+                                    const selectedText = markdownInput.value.substring(markdownInput.selectionStart, markdownInput.selectionEnd);
+                                    const linkText = selectedText || '链接文本';
+                                    const markdownLink = `[${linkText}](${text})`;
+                                    insertTextAtCursor(markdownLink);
+                                } else {
+                                    // 作为普通文本插入
+                                    insertTextAtCursor(text);
+                                }
+                                // 手动触发 input 事件以更新历史记录、预览和自动保存
+                                markdownInput.dispatchEvent(new Event('input', { bubbles: true }));
                             }
-                            // Manually trigger input event to update history and preview
-                            markdownInput.dispatchEvent(new Event('input'));
                         });
-                        return; // Handle only the first valid string item
+                        return; // 只处理第一个有效项目
                     }
                 }
+            } else {
+                 // 兼容旧浏览器或特殊情况，尝试获取文本数据
+                 const droppedText = event.dataTransfer.getData('text');
+                 if (droppedText) {
+                     insertTextAtCursor(droppedText);
+                     markdownInput.dispatchEvent(new Event('input', { bubbles: true }));
+                 }
             }
         });
 
-        // *** MODIFIED PASTE EVENT LISTENER ***
+        // 粘贴事件 (处理图片粘贴提示和文本粘贴)
         markdownInput.addEventListener('paste', function(event) {
             const clipboardData = event.clipboardData || window.clipboardData;
-            if (!clipboardData) return; // Exit if no clipboard data
+            if (!clipboardData) { return; } // 如果没有剪贴板数据则退出
 
             const items = clipboardData.items;
-            let handled = false; // Flag to track if the paste was handled
+            let handled = false; // 标记是否已处理
 
-            // Check clipboard items
+            // 遍历剪贴板项目
             for (let i = 0; i < items.length; i++) {
-                // --- IMAGE HANDLING ---
+                // --- 处理图片 ---
                 if (items[i].type.indexOf('image') !== -1) {
-                    event.preventDefault(); // Prevent the default paste action
+                    event.preventDefault(); // 阻止默认粘贴行为 (如插入 Base64 或文件对象)
                     handled = true;
 
-                    // Prompt the user for the image URL
-                    const imageUrl = prompt("检测到粘贴的图片，请输入该图片的网址 (URL):", "http://");
+                    // 弹出提示框让用户输入图片 URL
+                    const imageUrl = prompt("检测到粘贴的图片，请输入该图片的网址 (URL):", "https://");
 
-                    // Check if the user entered a URL (didn't cancel and didn't leave it empty/default)
-                    if (imageUrl && imageUrl.trim() !== "" && imageUrl.trim().toLowerCase() !== "http://") {
-                        const altText = "粘贴的图片"; // You could prompt for Alt text too if needed
+                    // 检查用户是否输入了有效的 URL (不为空、不是默认值、没取消)
+                    if (imageUrl && imageUrl.trim() !== "" && imageUrl.trim().toLowerCase() !== "https://") {
+                        const altText = "粘贴的图片"; // 可以进一步优化，比如让用户输入 Alt 文本
                         const markdownImage = `![${altText}](${imageUrl.trim()})`;
                         insertTextAtCursor(markdownImage);
-                        // Manually trigger input event to update history and preview
-                        markdownInput.dispatchEvent(new Event('input'));
+                        // 手动触发 input 事件
+                        markdownInput.dispatchEvent(new Event('input', { bubbles: true }));
                     } else {
-                        // Optional: Provide feedback if the user cancelled or entered nothing useful
                         console.log("图片粘贴操作已取消或未提供有效网址。");
-                         // Maybe insert a placeholder or do nothing
                     }
-                    break; // Handle only the first image found
+                    break; // 只处理第一个检测到的图片
                 }
             }
 
-            // --- TEXT HANDLING ---
-            // If not handled as an image, try handling as text
+            // --- 处理文本 ---
+            // 如果没有作为图片处理，则尝试作为文本处理
             if (!handled) {
-                // Check specifically for 'text/plain'
+                // 明确获取 'text/plain' 类型的数据
                 const text = clipboardData.getData('text/plain');
                 if (text) {
-                    event.preventDefault(); // Prevent the default text paste action
-                    handled = true; // Mark as handled
+                    event.preventDefault(); // 阻止默认的文本粘贴行为 (防止重复粘贴)
+                    handled = true;
                     insertTextAtCursor(text);
-                    // Manually trigger input event to update history and preview
-                    markdownInput.dispatchEvent(new Event('input'));
+                    // 手动触发 input 事件
+                    markdownInput.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }
 
-            // If handled is still false here, the browser might perform its default action
-            // for any unhandled paste types.
+            // 如果 handled 仍然是 false，则允许浏览器处理其他可能的粘贴类型
         });
 
-        // Event listener for the download button
-        downloadButton.addEventListener('click', function() {
-            const markdownContent = markdownInput.value;
-            const filename = 'MyMarkdown.md'; // Default filename
-            const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' }); // Specify charset
+        // 下载按钮点击事件 (带自定义文件名和兼容方案)
+        downloadButton.addEventListener('click', async function() { // 使用 async 以便内部用 await
+            // 1. 提示用户输入文件名
+            let desiredFilename = prompt("请输入要保存的文件名:", "MyMarkdown.md");
 
-            // Use File System Access API if available (more modern)
-            if (window.showSaveFilePicker) {
+            if (desiredFilename === null) {
+                console.log("下载已取消。");
+                return; // 用户取消
+            }
+
+            // 2. 清理文件名并确保有 .md 后缀
+            desiredFilename = desiredFilename.trim();
+            if (desiredFilename === "") {
+                desiredFilename = "Untitled.md"; // 输入为空时的默认名
+            }
+            if (!desiredFilename.toLowerCase().endsWith('.md')) {
+                desiredFilename += '.md';
+            }
+            const finalFilename = desiredFilename;
+
+            // 3. 获取当前内容并创建 Blob 对象
+            const markdownContent = markdownInput.value;
+            const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+
+            // 4. 尝试使用 File System Access API (现代浏览器)
+            if (window.showSaveFilePicker && typeof window.showSaveFilePicker === 'function') {
+                console.log("尝试使用 File System Access API 下载...");
                 const options = {
-                    suggestedName: filename,
+                    suggestedName: finalFilename,
                     types: [{
                         description: 'Markdown 文件',
                         accept: { 'text/markdown': ['.md'] },
                     }],
                 };
-                window.showSaveFilePicker(options).then(async (fileHandle) => {
+                try {
+                    const fileHandle = await window.showSaveFilePicker(options);
                     const writable = await fileHandle.createWritable();
                     await writable.write(blob);
                     await writable.close();
-                }).catch(err => {
-                    // Handle errors, e.g., user cancellation
-                    if (err.name !== 'AbortError') {
-                        console.error('无法保存文件:', err);
-                        alert('保存文件失败。');
+                    console.log("文件已通过 File System Access API 成功保存。");
+                    return; // 保存成功，结束
+                } catch (err) {
+                    if (err.name === 'AbortError') {
+                        console.log('用户取消了保存操作 (FSA API)。');
+                        return; // 用户在保存对话框中取消，则不进行回退
+                    } else {
+                        console.error('File System Access API 失败:', err);
+                        console.log("尝试回退到旧版下载方法...");
+                        // 如果出错（非用户取消），则继续尝试旧方法
                     }
-                });
-            } else {
-                // Fallback for older browsers using download link
+                }
+            }
+
+            // 5. 回退方案：使用 <a> 标签下载 (兼容旧浏览器)
+            console.log("使用旧版下载方法 (<a> 标签)...");
+            try {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = filename;
-                document.body.appendChild(a); // Append link to body
-                a.click(); // Programmatically click the link
-                document.body.removeChild(a); // Remove link from body
-                URL.revokeObjectURL(url); // Release the object URL
+                a.download = finalFilename; // 设置下载文件名
+                a.style.display = 'none'; // 隐藏链接
+                document.body.appendChild(a);
+                a.click(); // 模拟点击
+                document.body.removeChild(a); // 移除链接
+                URL.revokeObjectURL(url); // 释放 URL 对象
+                console.log("旧版下载已启动。");
+            } catch (fallbackError) {
+                console.error("旧版下载方法失败:", fallbackError);
+                alert("下载文件失败。您的浏览器可能不支持此操作或发生内部错误。");
             }
         });
 
-        // Initial setup: push initial state to history and render preview
-        history.push(markdownInput.value);
-        historyIndex = 0;
+        // --- 初始化 ---
+        // 确保初始内容被添加到历史记录中
+        if (history.length === 0 || history[history.length - 1] !== markdownInput.value) {
+            history.push(markdownInput.value);
+        }
+        historyIndex = history.length - 1;
+
+        // 页面加载完成后，立即更新一次预览
         updatePreview();
 
     </script>
